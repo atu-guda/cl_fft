@@ -18,6 +18,31 @@ int debug = 0;
 const int max_cols = 16;
 void show_help(const char *pname );
 
+class Fftw_Complex {
+  public:
+   explicit  Fftw_Complex( unsigned asz );
+   Fftw_Complex( const Fftw_Complex &r ) = delete;
+   ~Fftw_Complex();
+   double  operator()( unsigned i, unsigned j ) const { return d[i][j]; };
+   double& operator()( unsigned i, unsigned j )       { return d[i][j]; };
+   fftw_complex* data() { return d; };
+   const fftw_complex* cdata() { return d; };
+  protected:
+   unsigned sz;
+   fftw_complex *d;
+};
+
+Fftw_Complex::Fftw_Complex( unsigned asz )
+  : sz( asz ),
+  d( (fftw_complex*) fftw_malloc( sz * sizeof( fftw_complex ) ) )
+{
+}
+
+Fftw_Complex::~Fftw_Complex()
+{
+  fftw_free( d );
+}
+
 int main( int argc, char **argv )
 {
   int op, n = 0, t_idx = 0, x_idx = 1, idx_max;
@@ -32,8 +57,6 @@ int main( int argc, char **argv )
 
   double dt = 0, old_t = 0;
   vector<double> in_x;
-  fftw_complex *out;
-  fftw_plan plan;
 
   while( (op = getopt( argc, argv, "hdcrt:x:f:o:0z") ) != -1 ) {
     switch ( op ) {
@@ -129,9 +152,10 @@ int main( int argc, char **argv )
   o_n = 1 + n/2;
   cerr << "n= " << n << " dt = " << dt << endl;
 
-  out = (fftw_complex*) fftw_malloc( (2+o_n) * sizeof( fftw_complex ) );
+  Fftw_Complex out( 2+o_n );
 
-  plan = fftw_plan_dft_r2c_1d( n, &(in_x[0]), out, FFTW_ESTIMATE );
+  fftw_plan plan;
+  plan = fftw_plan_dft_r2c_1d( n, &(in_x[0]), out.data(), FFTW_ESTIMATE );
 
   fftw_execute( plan );
   fftw_destroy_plan( plan );
@@ -146,9 +170,9 @@ int main( int argc, char **argv )
       break;
     }
     if( calc_cmpl ) {
-       *os << fr << ' ' << out[i][0] << ' ' << out[i][1] << endl;
+       *os << fr << ' ' << out( i, 0 ) << ' ' << out( i, 1 ) << endl;
     } else {
-       *os << fr << ' ' << 2.0 * hypot( out[i][0], out[i][1] ) / ( double(n) ) << endl;
+       *os << fr << ' ' << 2.0 * hypot( out( i, 0 ), out( i, 1 ) ) / ( double(n) ) << endl;
     }
   }
 
