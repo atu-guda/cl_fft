@@ -24,7 +24,7 @@ int main( int argc, char **argv )
   int o_n;
   unsigned f_dir = FFTW_FORWARD;
   double f_max = DBL_MAX;
-  char *ifile;
+  const char *ifile;
   string s;
   bool calc_cmpl = false, drop_zero = false, out_Hz = false;
 
@@ -62,6 +62,9 @@ int main( int argc, char **argv )
   }
 
   ifile = argv[optind];
+  if( ifile[0] == '-' || ifile[1] == '\0' ) {
+    ifile = "/dev/stdin";
+  }
   idx_max = max( t_idx, x_idx );
   vector<double> vals( idx_max+2 );
 
