@@ -94,10 +94,6 @@ int main( int argc, char **argv )
     return 1;
   };
 
-  if( f_dir == FFTW_BACKWARD ) { // TODO: implement
-    cerr << "backword transform is unimplemented now" << endl;
-    return 5;
-  }
 
 
   const char *ifile = argv[optind];
@@ -129,15 +125,21 @@ int main( int argc, char **argv )
   ifs.close();
   cerr << "# n= " << n << " dt = " << dt << endl;
 
-  Fftw_Data out( n, dt );
+  if( f_dir == FFTW_BACKWARD ) { // TODO: implement
+    cerr << "backword transform is unimplemented now" << endl;
+    return 5;
+  } else {
 
-  fftw_plan plan;
-  plan = fftw_plan_dft_r2c_1d( n, &(in_x[0]), out.data(), FFTW_ESTIMATE );
+    Fftw_Data out( n, dt );
 
-  fftw_execute( plan );
-  fftw_destroy_plan( plan );
+    fftw_plan plan;
+    plan = fftw_plan_dft_r2c_1d( n, &(in_x[0]), out.data(), FFTW_ESTIMATE );
 
-  out_res( *os, out, o_prm );
+    fftw_execute( plan );
+    fftw_destroy_plan( plan );
+
+    out_res( *os, out, o_prm );
+  }
 
   return 0;
 }
