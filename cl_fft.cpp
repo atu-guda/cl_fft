@@ -19,7 +19,7 @@ const int max_cols = 16;
 
 class Fftw_Data {
   public:
-   Fftw_Data( unsigned asz, unsigned a_n_in, double a_dt );
+   Fftw_Data( unsigned a_n_in, double a_dt );
    Fftw_Data( const Fftw_Data &r ) = delete;
    ~Fftw_Data();
    double  operator()( unsigned i, unsigned j ) const { return d[i][j]; };
@@ -31,13 +31,13 @@ class Fftw_Data {
    double get_dt() const { return dt; }
 
   protected:
-   unsigned sz, n_in;
+   unsigned n_in, sz;
    double dt;
    fftw_complex *d;
 };
 
-Fftw_Data::Fftw_Data( unsigned asz, unsigned a_n_in, double a_dt )
-  : sz( asz ),  n_in( a_n_in ), dt( a_dt ),
+Fftw_Data::Fftw_Data( unsigned a_n_in, double a_dt )
+  :   n_in( a_n_in ), sz( n_in/2+1 ), dt( a_dt ),
   d( (fftw_complex*) fftw_malloc( sz * sizeof( fftw_complex ) ) )
 {
 }
@@ -55,19 +55,19 @@ struct out_params {
 };
 
 void out_res( ostream &os, const Fftw_Data &d, const out_params &p );
+unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> &d, double &dt );
 void show_help( const char *pname );
 
 int main( int argc, char **argv )
 {
-  int op, n = 0, t_idx = 0, x_idx = 1, idx_max;
-  int o_n;
+  int op, t_idx = 0, x_idx = 1;
   unsigned f_dir = FFTW_FORWARD;
   out_params o_prm;
   const char *ofile = nullptr;
 
   ostream *os = &cout;
 
-  double dt = 0, old_t = 0;
+  double dt = 0;
   vector<double> in_x;
 
   while( (op = getopt( argc, argv, "hdcrt:x:f:o:0z") ) != -1 ) {
@@ -120,52 +120,16 @@ int main( int argc, char **argv )
     os = &ofs;
   }
 
-  idx_max = max( t_idx, x_idx );
-  vector<double> vals( idx_max+2 );
-
-  in_x.reserve( 1024 * 128 ); // large enough
-  while( ifs ) {
-    string s;
-    getline( ifs, s );
-    if( s.empty() ) {
-      continue;
-    }
-    if( s[0] == '#' || s[0] == ';' ) {
-      continue;
-    }
-    istringstream is( s );
-    vals.assign( vals.size(), 0 );
-
-    int i; // need after for
-    for( i=0; i<= idx_max ;  ) {
-      double v = DBL_MAX;
-      is >> v;
-      if( v == DBL_MAX ) {
-        cerr << "Read only " << i << " columns in line " << n << endl;
-        return 3;
-      }
-      vals[i] = v;
-      ++i;
-    }
-    if( n == 0 ) {
-      old_t = vals[t_idx];
-    }
-    if( n == 1 ) {
-      dt = vals[t_idx] - old_t;
-      if( dt <= 0 ) {
-        cerr << "Bad delta t value: " << dt << " = " << vals[t_idx]
-             << " - " << old_t;
-      }
-    }
-    in_x.push_back( vals[x_idx] );
-    ++n;
-  };
+  unsigned n =  read_infile( ifs, t_idx, x_idx, in_x, dt );
+  if( n < 1 ) {
+    cerr << "input data error" << endl;
+    return 4;
+  }
 
   ifs.close();
-  o_n = 1 + n/2;
-  cerr << "# n= " << n << " o_n= " << o_n << " dt = " << dt << endl;
+  cerr << "# n= " << n << " dt = " << dt << endl;
 
-  Fftw_Data out( o_n, n, dt );
+  Fftw_Data out( n, dt );
 
   fftw_plan plan;
   plan = fftw_plan_dft_r2c_1d( n, &(in_x[0]), out.data(), FFTW_ESTIMATE );
@@ -176,6 +140,56 @@ int main( int argc, char **argv )
   out_res( *os, out, o_prm );
 
   return 0;
+}
+
+unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> &d, double &dt )
+{
+  unsigned n = 0;
+  double old_t = 0;
+
+  auto idx_max = max( t_idx, x_idx );
+  vector<double> vals( idx_max+2 );
+
+  d.reserve( 1024 * 128 ); // large enough
+  while( is ) {
+    string s;
+    getline( is, s );
+    if( s.empty() ) {
+      continue;
+    }
+    if( s[0] == '#' || s[0] == ';' ) {
+      continue;
+    }
+    istringstream is( s );
+    vals.assign( vals.size(), 0 );
+
+    unsigned i; // need after for
+    for( i=0; i<= idx_max ; /* NOP */ ) {
+      double v = DBL_MAX;
+      is >> v;
+      if( v == DBL_MAX ) {
+        cerr << "Read only " << i << " columns in line " << n << endl;
+        return 0;
+      }
+      vals[i] = v;
+      ++i;
+    }
+    if( n == 0 ) {
+      old_t = vals[t_idx];
+    }
+    if( n == 1 ) {
+      dt = vals[t_idx] - old_t;
+      if( dt <= 0 ) {
+        cerr << "Error: Bad delta t value: " << dt << " = " << vals[t_idx]
+             << " - " << old_t;
+        return 0;
+      }
+    }
+    d.push_back( vals[x_idx] );
+    ++n;
+  };
+
+  return n;
 }
 
 void out_res( ostream &os, const Fftw_Data &d, const out_params &p )
