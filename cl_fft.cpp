@@ -50,7 +50,6 @@ int main( int argc, char **argv )
   unsigned f_dir = FFTW_FORWARD;
   double f_max = DBL_MAX;
   const char *ofile = nullptr;
-  string s;
   bool calc_cmpl = false, drop_zero = false, out_Hz = false;
 
   ostream *os = &cout;
@@ -102,7 +101,7 @@ int main( int argc, char **argv )
   if( ofile ) {
     ofs.open( ofile );
     if( ! ofs ) {
-      cerr << "Fail to open optput file <" << ofile << "> : " << strerror(errno) << endl;
+      cerr << "Fail to open output file <" << ofile << "> : " << strerror(errno) << endl;
       return 3;
     }
     os = &ofs;
@@ -111,7 +110,9 @@ int main( int argc, char **argv )
   idx_max = max( t_idx, x_idx );
   vector<double> vals( idx_max+2 );
 
+  in_x.reserve( 1024 * 128 ); // large enough
   while( ifs ) {
+    string s;
     getline( ifs, s );
     if( s.empty() ) {
       continue;
@@ -121,7 +122,6 @@ int main( int argc, char **argv )
     }
     istringstream is( s );
     vals.assign( vals.size(), 0 );
-    in_x.reserve( 1024 * 128 ); // large enough
 
     int i; // need after for
     for( i=0; i<= idx_max ;  ) {
@@ -150,7 +150,7 @@ int main( int argc, char **argv )
 
   ifs.close();
   o_n = 1 + n/2;
-  cerr << "n= " << n << " dt = " << dt << endl;
+  cerr << "# n= " << n << " dt = " << dt << endl;
 
   Fftw_Complex out( 2+o_n );
 
@@ -161,11 +161,9 @@ int main( int argc, char **argv )
   fftw_destroy_plan( plan );
 
   int st = drop_zero ? 1 : 0;
+  double f_coeff = ( out_Hz ? 1 : (2 * M_PI) ) / ( dt*n );
   for( int i=st; i<o_n ; ++i ) {
-    double fr = (double)(i) / ( dt*n );
-    if( !out_Hz ) {
-      fr *= 2 * M_PI;
-    }
+    double fr = f_coeff * i;
     if( fr > f_max ) {
       break;
     }
