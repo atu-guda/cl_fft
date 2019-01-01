@@ -24,16 +24,18 @@ int main( int argc, char **argv )
   int o_n;
   unsigned f_dir = FFTW_FORWARD;
   double f_max = DBL_MAX;
-  const char *ifile;
+  const char *ofile = nullptr;
   string s;
   bool calc_cmpl = false, drop_zero = false, out_Hz = false;
+
+  ostream *os = &cout;
 
   double dt = 0, old_t = 0;
   vector<double> in_x;
   fftw_complex *out;
   fftw_plan plan;
 
-  while( (op = getopt( argc, argv, "hdcrt:x:f:0z") ) != -1 ) {
+  while( (op = getopt( argc, argv, "hdcrt:x:f:o:0z") ) != -1 ) {
     switch ( op ) {
       case 'h': show_help( argv[0] );  return 0;
       case 'd': debug++;                break;
@@ -42,9 +44,10 @@ int main( int argc, char **argv )
       case 't': t_idx = atoi( optarg ); break;
       case 'x': x_idx = atoi( optarg ); break;
       case 'f': f_max = atof( optarg ); break;
+      case 'o': ofile = optarg;         break;
       case '0': drop_zero = true;       break;
       case 'z': out_Hz = true;          break;
-      default: fprintf( stderr, "Unknown or bad option <%c>\n", optopt );
+      default: cerr << "Unknown or bad option '" << (char)optopt << endl;
                show_help( argv[0] );
                return 1;
     };
@@ -61,18 +64,29 @@ int main( int argc, char **argv )
     return 5;
   }
 
-  ifile = argv[optind];
+
+  const char *ifile = argv[optind];
   if( ifile[0] == '-' || ifile[1] == '\0' ) {
     ifile = "/dev/stdin";
   }
-  idx_max = max( t_idx, x_idx );
-  vector<double> vals( idx_max+2 );
-
   ifstream ifs( ifile );
   if( ! ifs ) {
     cerr << "Fail to open file <" << ifile << "> : " << strerror(errno) << endl;
     return 2;
   }
+
+  ofstream ofs;
+  if( ofile ) {
+    ofs.open( ofile );
+    if( ! ofs ) {
+      cerr << "Fail to open optput file <" << ofile << "> : " << strerror(errno) << endl;
+      return 3;
+    }
+    os = &ofs;
+  }
+
+  idx_max = max( t_idx, x_idx );
+  vector<double> vals( idx_max+2 );
 
   while( ifs ) {
     getline( ifs, s );
@@ -122,10 +136,8 @@ int main( int argc, char **argv )
   fftw_execute( plan );
   fftw_destroy_plan( plan );
 
-  for( int i=0; i<o_n ; ++i ) {
-    if( i == 0 && drop_zero ) {
-      continue;
-    }
+  int st = drop_zero ? 1 : 0;
+  for( int i=st; i<o_n ; ++i ) {
     double fr = (double)(i) / ( dt*n );
     if( !out_Hz ) {
       fr *= 2 * M_PI;
@@ -134,9 +146,9 @@ int main( int argc, char **argv )
       break;
     }
     if( calc_cmpl ) {
-       cout << fr << ' ' << out[i][0] << ' ' << out[i][1] << endl;
+       *os << fr << ' ' << out[i][0] << ' ' << out[i][1] << endl;
     } else {
-       cout << fr << ' ' << 2.0 * hypot( out[i][0], out[i][1] ) / ( double(n) ) << endl;
+       *os << fr << ' ' << 2.0 * hypot( out[i][0], out[i][1] ) / ( double(n) ) << endl;
     }
   }
 
@@ -145,7 +157,7 @@ int main( int argc, char **argv )
 
 void show_help( const char *pname )
 {
-  cerr << "Usage: " << pname << " [opts] infile\n opts:\n";
+  cerr << "Usage: " << pname << " [opts] infile|-\n opts:\n";
   cerr << "  -h = help\n";
   cerr << "  -d = debug++\n";
   cerr << "  -c = complex output\n";
@@ -153,6 +165,7 @@ void show_help( const char *pname )
   cerr << "  -t idx  = index of 't' column, def = 0\n";
   cerr << "  -x idx  = index of 'x' column, def = 1\n";
   cerr << "  -f val  = maximum required frequency \n";
+  cerr << "  -o file  = set output file \n";
   cerr << "  -0      = drop zero frequency from output \n";
   cerr << "  -z      = output in ordinary frequency (Hz), not in omega\n";
 }
