@@ -16,41 +16,54 @@ using namespace std;
 
 int debug = 0;
 const int max_cols = 16;
-void show_help(const char *pname );
 
-class Fftw_Complex {
+class Fftw_Data {
   public:
-   explicit  Fftw_Complex( unsigned asz );
-   Fftw_Complex( const Fftw_Complex &r ) = delete;
-   ~Fftw_Complex();
+   Fftw_Data( unsigned asz, unsigned a_n_in, double a_dt );
+   Fftw_Data( const Fftw_Data &r ) = delete;
+   ~Fftw_Data();
    double  operator()( unsigned i, unsigned j ) const { return d[i][j]; };
    double& operator()( unsigned i, unsigned j )       { return d[i][j]; };
    fftw_complex* data() { return d; };
    const fftw_complex* cdata() { return d; };
+   unsigned size() const { return sz; }
+   unsigned get_N_in() const { return n_in; }
+   double get_dt() const { return dt; }
+
   protected:
-   unsigned sz;
+   unsigned sz, n_in;
+   double dt;
    fftw_complex *d;
 };
 
-Fftw_Complex::Fftw_Complex( unsigned asz )
-  : sz( asz ),
+Fftw_Data::Fftw_Data( unsigned asz, unsigned a_n_in, double a_dt )
+  : sz( asz ),  n_in( a_n_in ), dt( a_dt ),
   d( (fftw_complex*) fftw_malloc( sz * sizeof( fftw_complex ) ) )
 {
 }
 
-Fftw_Complex::~Fftw_Complex()
+Fftw_Data::~Fftw_Data()
 {
   fftw_free( d );
 }
+
+struct out_params {
+  double f_max = DBL_MAX;
+  bool out_complex = false;
+  bool drop_zero = false;
+  bool out_Hz = false;
+};
+
+void out_res( ostream &os, const Fftw_Data &d, const out_params &p );
+void show_help( const char *pname );
 
 int main( int argc, char **argv )
 {
   int op, n = 0, t_idx = 0, x_idx = 1, idx_max;
   int o_n;
   unsigned f_dir = FFTW_FORWARD;
-  double f_max = DBL_MAX;
+  out_params o_prm;
   const char *ofile = nullptr;
-  bool calc_cmpl = false, drop_zero = false, out_Hz = false;
 
   ostream *os = &cout;
 
@@ -61,14 +74,14 @@ int main( int argc, char **argv )
     switch ( op ) {
       case 'h': show_help( argv[0] );  return 0;
       case 'd': debug++;                break;
-      case 'c': calc_cmpl = true;       break;
+      case 'c': o_prm.out_complex = true;       break;
       case 'r': f_dir = FFTW_BACKWARD;  break;
       case 't': t_idx = atoi( optarg ); break;
       case 'x': x_idx = atoi( optarg ); break;
-      case 'f': f_max = atof( optarg ); break;
+      case 'f': o_prm.f_max = atof( optarg ); break;
       case 'o': ofile = optarg;         break;
-      case '0': drop_zero = true;       break;
-      case 'z': out_Hz = true;          break;
+      case '0': o_prm.drop_zero = true;       break;
+      case 'z': o_prm.out_Hz = true;          break;
       default: cerr << "Unknown or bad option '" << (char)optopt << endl;
                show_help( argv[0] );
                return 1;
@@ -150,9 +163,9 @@ int main( int argc, char **argv )
 
   ifs.close();
   o_n = 1 + n/2;
-  cerr << "# n= " << n << " dt = " << dt << endl;
+  cerr << "# n= " << n << " o_n= " << o_n << " dt = " << dt << endl;
 
-  Fftw_Complex out( 2+o_n );
+  Fftw_Data out( o_n, n, dt );
 
   fftw_plan plan;
   plan = fftw_plan_dft_r2c_1d( n, &(in_x[0]), out.data(), FFTW_ESTIMATE );
@@ -160,21 +173,28 @@ int main( int argc, char **argv )
   fftw_execute( plan );
   fftw_destroy_plan( plan );
 
-  int st = drop_zero ? 1 : 0;
-  double f_coeff = ( out_Hz ? 1 : (2 * M_PI) ) / ( dt*n );
-  for( int i=st; i<o_n ; ++i ) {
-    double fr = f_coeff * i;
-    if( fr > f_max ) {
-      break;
-    }
-    if( calc_cmpl ) {
-       *os << fr << ' ' << out( i, 0 ) << ' ' << out( i, 1 ) << endl;
-    } else {
-       *os << fr << ' ' << 2.0 * hypot( out( i, 0 ), out( i, 1 ) ) / ( double(n) ) << endl;
-    }
-  }
+  out_res( *os, out, o_prm );
 
   return 0;
+}
+
+void out_res( ostream &os, const Fftw_Data &d, const out_params &p )
+{
+  unsigned o_n = d.size();
+  unsigned st = p.drop_zero ? 1 : 0;
+  auto n = d.get_N_in();
+  double f_coeff = ( p.out_Hz ? 1 : (2 * M_PI) ) / ( d.get_dt() * n );
+  for( unsigned i=st; i<o_n ; ++i ) {
+    double fr = f_coeff * i;
+    if( fr > p.f_max ) {
+      break;
+    }
+    if( p.out_complex ) {
+       os << fr << ' ' << d( i, 0 ) << ' ' << d( i, 1 ) << endl;
+    } else {
+       os << fr << ' ' << 2.0 * hypot( d( i, 0 ), d( i, 1 ) ) / ( double(n) ) << endl;
+    }
+  }
 }
 
 void show_help( const char *pname )
