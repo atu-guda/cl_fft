@@ -189,22 +189,30 @@ unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double
       is >> v;
       if( v == DBL_MAX ) {
         cerr << "Read only " << i << " columns in line " << n_line << " n= " << n << endl;
+        cerr << "Line: \"" << s << "\"" << endl;
         return 0;
       }
       vals[i] = v;
       ++i;
     }
+
+    auto c_t  = vals[t_idx];
+    auto c_dt = c_t - old_t;
     if( n == 0 ) {
-      old_t = vals[t_idx];
-    }
-    if( n == 1 ) {
-      dt = vals[t_idx] - old_t;
+      // NOP
+    } else if( n == 1 ) {
+      dt = c_dt;
       if( dt <= 0 ) {
-        cerr << "Error: Bad delta t value: " << dt << " = " << vals[t_idx]
-             << " - " << old_t;
+        cerr << "Error: Bad delta t value: " << dt << " = " << c_t << " - " << old_t;
         return 0;
       }
+    } else {
+      if( fabs( ( c_dt - dt ) / dt ) > 1e-2 ) {
+        cerr << "Inconsistent dt " << c_dt << " in line " << n_line << " n= " << n << endl;
+      }
     }
+    old_t = vals[t_idx];
+
     d.push_back( vals[x_idx] );
     ++n;
   };

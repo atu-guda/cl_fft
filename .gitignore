@@ -1,5 +1,11 @@
 cl_fft
 
+# test data
+*.txt
+
+# vim
+.*.swp
+
 # Prerequisites
 *.d
 
@@ -32,3 +38,4 @@ cl_fft
 *.exe
 *.out
 *.app
+
