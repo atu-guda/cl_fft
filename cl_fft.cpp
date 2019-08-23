@@ -17,11 +17,21 @@ using namespace std;
 int debug = 0;
 const int max_cols = 16;
 
+string trim( const string &s )
+{
+  auto i = s.begin();
+  for( ; i != s.end() && isspace( *i ) ; ++i ) {}
+  auto ri = s.rbegin();
+  for( ; ri.base() != i && isspace( *ri ); ++ri ) {}
+  return string( i, ri.base() );
+}
+
 class Fftw_Data {
   public:
    Fftw_Data( unsigned a_n_in, double a_dt );
    Fftw_Data( const Fftw_Data &r ) = delete;
    ~Fftw_Data();
+   Fftw_Data& operator=( const Fftw_Data &rhs ) = delete;
    double  operator()( unsigned i, unsigned j ) const { return d[i][j]; };
    double& operator()( unsigned i, unsigned j )       { return d[i][j]; };
    fftw_complex* data() { return d; };
@@ -89,7 +99,7 @@ int main( int argc, char **argv )
   };
 
   if( optind != argc-1 ) {
-    fprintf( stderr, "Error in parameters: need input filename\n" );
+    cerr << "Error in parameters: need input filename\n";
     show_help( argv[0] );
     return 1;
   };
@@ -125,14 +135,20 @@ int main( int argc, char **argv )
   ifs.close();
   cerr << "# n= " << n << " dt = " << dt << endl;
 
+  // fftw_plan plan;
   if( f_dir == FFTW_BACKWARD ) { // TODO: implement
-    cerr << "backword transform is unimplemented now" << endl;
-    return 5;
+    cerr << "backword transform is unimplemented for now" << endl;
+    return 10;
+    // Fftw_Data out( n, dt );
+    // plan =  fftw_plan_r2r_1d( n, &(in_x[0]), out.data(), FFTW_REDFT00, FFTW_ESTIMATE );
+    // fftw_execute( plan );
+
+    // out_res( *os, out, o_prm );
   } else {
 
+    fftw_plan plan;
     Fftw_Data out( n, dt );
 
-    fftw_plan plan;
     plan = fftw_plan_dft_r2c_1d( n, &(in_x[0]), out.data(), FFTW_ESTIMATE );
 
     fftw_execute( plan );
@@ -146,7 +162,7 @@ int main( int argc, char **argv )
 
 unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> &d, double &dt )
 {
-  unsigned n = 0;
+  unsigned n = 0, n_line = 0;
   double old_t = 0;
 
   auto idx_max = max( t_idx, x_idx );
@@ -156,6 +172,8 @@ unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double
   while( is ) {
     string s;
     getline( is, s );
+    s = trim( s );
+    ++n_line;
     if( s.empty() ) {
       continue;
     }
@@ -170,7 +188,7 @@ unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double
       double v = DBL_MAX;
       is >> v;
       if( v == DBL_MAX ) {
-        cerr << "Read only " << i << " columns in line " << n << endl;
+        cerr << "Read only " << i << " columns in line " << n_line << " n= " << n << endl;
         return 0;
       }
       vals[i] = v;
@@ -199,7 +217,7 @@ void out_res( ostream &os, const Fftw_Data &d, const out_params &p )
   unsigned o_n = d.size();
   unsigned st = p.drop_zero ? 1 : 0;
   auto n = d.get_N_in();
-  double f_coeff = ( p.out_Hz ? 1 : (2 * M_PI) ) / ( d.get_dt() * n );
+  double f_coeff = ( p.out_Hz ? 1 : (2 * M_PI) )  /  ( d.get_dt() * n );
   for( unsigned i=st; i<o_n ; ++i ) {
     double fr = f_coeff * i;
     if( fr > p.f_max ) {
@@ -215,16 +233,17 @@ void out_res( ostream &os, const Fftw_Data &d, const out_params &p )
 
 void show_help( const char *pname )
 {
-  cerr << "Usage: " << pname << " [opts] infile|-\n opts:\n";
-  cerr << "  -h = help\n";
-  cerr << "  -d = debug++\n";
-  cerr << "  -c = complex output\n";
-  cerr << "  -r = reverse transform (unimplemented)\n";
-  cerr << "  -t idx  = index of 't' column, def = 0\n";
-  cerr << "  -x idx  = index of 'x' column, def = 1\n";
-  cerr << "  -f val  = maximum required frequency \n";
-  cerr << "  -o file  = set output file \n";
-  cerr << "  -0      = drop zero frequency from output \n";
-  cerr << "  -z      = output in ordinary frequency (Hz), not in omega\n";
+  cerr << "Usage: " << pname << " [opts] infile|-\n opts:\n"
+          "  -h = help\n"
+          "  -d = debug++\n"
+          "  -c = complex output\n"
+          "  -r = reverse transform (unimplemented)\n"
+          "  -t idx  = index of 't' column, def = 0\n"
+          "  -x idx  = index of 'x' column, def = 1\n"
+          "  -f val  = maximum required frequency \n"
+          "  -o file  = set output file \n"
+          "  -0      = drop zero frequency from output \n"
+          "  -z      = output in ordinary frequency (Hz), not in omega\n"
+          ;
 }
 
