@@ -15,7 +15,6 @@
 using namespace std;
 
 int debug = 0;
-const int max_cols = 16;
 
 string trim( const string &s )
 {
@@ -169,10 +168,9 @@ int main( int argc, char **argv )
 size_t read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> &d, double &dt )
 {
   size_t n {0}, n_line {0};
-  double old_t = 0;
+  double old_t { 0 };
 
   auto idx_max = max( t_idx, x_idx );
-  vector<double> vals( idx_max+2 );
 
   d.reserve( 1024 * 128 ); // large enough
   while( is ) {
@@ -185,22 +183,37 @@ size_t read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> 
     }
 
     istringstream is( s );
-    vals.assign( vals.size(), 0 );
 
-    unsigned i; // need after for
-    for( i=0; i<= idx_max ; /* NOP */ ) {
-      double v = DBL_MAX; // to catch read fail
-      is >> v;
-      if( v >= DBL_MAX ) {
+    double c_t {0}, x {0};
+    for( unsigned i=0; i<= idx_max ; ++i ) {
+      string sv;
+      is >> sv;
+      if( !is || sv.empty() ) {
         cerr << "Read only " << i << " columns in line " << n_line << " n= " << n << endl;
         cerr << "Line: \"" << s << "\"" << endl;
         return 0;
       }
-      vals[i] = v;
-      ++i;
+
+      if( i != t_idx  &&  i != x_idx ) { // skip unused, TODO: complex
+        continue;
+      }
+
+      size_t epos;
+      double v = stod( sv, &epos );
+      if( epos < 1 ) {
+        cerr << "Fail to convert column " << i << " in line " << n_line << " n= " << n << endl;
+        cerr << "Column: \"" << sv << "\" Line: \"" << s << "\"" << endl;
+        return 0;
+      }
+      if( i == t_idx ) {
+        c_t = v;
+      } else if( i == x_idx ) {
+        x = v;
+      } else {
+        cerr << "# warn: unused index " << i << endl;
+      }
     }
 
-    auto c_t  = vals[t_idx];
     auto c_dt = c_t - old_t;
     if( n == 0 ) {
       // NOP
@@ -211,15 +224,17 @@ size_t read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> 
         return 0;
       }
     } else {
-      if( fabs( ( c_dt - dt ) / dt ) > 1e-2 ) {
-        cerr << "Inconsistent dt " << c_dt << " in line " << n_line << " n= " << n << endl;
+      if( fabs( ( c_dt - dt ) / dt ) > 3e-1 ) {
+        cerr << "Inconsistent dt " << c_dt << ' ' << dt << " in line " << n_line << " n= " << n << endl;
       }
     }
-    old_t = vals[t_idx];
+    old_t = c_t;
 
-    d.push_back( vals[x_idx] );
+    d.push_back( x );
     ++n;
   };
+
+  cerr << "# debug: dt_1= " << dt << " dt_n = " << ( old_t / n ) << endl;
 
   return n;
 }
