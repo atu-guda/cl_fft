@@ -187,7 +187,7 @@ unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double
     for( i=0; i<= idx_max ; /* NOP */ ) {
       double v = DBL_MAX;
       is >> v;
-      if( v == DBL_MAX ) {
+      if( v >= DBL_MAX ) {
         cerr << "Read only " << i << " columns in line " << n_line << " n= " << n << endl;
         cerr << "Line: \"" << s << "\"" << endl;
         return 0;
