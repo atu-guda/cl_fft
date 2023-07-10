@@ -57,7 +57,7 @@ Fftw_Data::~Fftw_Data()
   fftw_free( d );
 }
 
-struct out_params {
+struct pgm_params {
   double f_max     = DBL_MAX;
   bool out_complex = false;
   bool in_complex  = false;
@@ -65,7 +65,7 @@ struct out_params {
   bool out_Hz      = false;
 };
 
-void out_res( ostream &os, const Fftw_Data &d, const out_params &p );
+void out_res( ostream &os, const Fftw_Data &d, const pgm_params &p );
 size_t read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> &d, double &dt );
 void show_help( const char *pname );
 
@@ -73,7 +73,7 @@ int main( int argc, char **argv )
 {
   int op, t_idx = 0, x_idx = 1;
   unsigned f_dir = FFTW_FORWARD;
-  out_params o_prm;
+  pgm_params p_prm;
   const char *ofile = nullptr;
 
   ostream *os = &cout;
@@ -85,15 +85,15 @@ int main( int argc, char **argv )
     switch ( op ) {
       case 'h': show_help( argv[0] );           return 0;
       case 'd': debug++;                        break;
-      case 'c': o_prm.out_complex = true;       break;
-      case 'C': o_prm.in_complex  = true;       break;
+      case 'c': p_prm.out_complex = true;       break;
+      case 'C': p_prm.in_complex  = true;       break;
       case 'r': f_dir = FFTW_BACKWARD;          break;
       case 't': t_idx = atoi( optarg );         break;
       case 'x': x_idx = atoi( optarg );         break;
-      case 'f': o_prm.f_max = atof( optarg );   break;
+      case 'f': p_prm.f_max = atof( optarg );   break;
       case 'o': ofile = optarg;                 break;
-      case '0': o_prm.drop_zero = true;         break;
-      case 'z': o_prm.out_Hz = true;            break;
+      case '0': p_prm.drop_zero = true;         break;
+      case 'z': p_prm.out_Hz = true;            break;
       default: cerr << "Unknown or bad option '" << (char)optopt << endl;
                show_help( argv[0] );
                return 1;
@@ -144,10 +144,10 @@ int main( int argc, char **argv )
     // plan =  fftw_plan_r2r_1d( n, &(in_x[0]), out.data(), FFTW_REDFT00, FFTW_ESTIMATE );
     // fftw_execute( plan );
 
-    // out_res( *os, out, o_prm );
+    // out_res( *os, out, p_prm );
   }
 
-  if( o_prm.in_complex ) {
+  if( p_prm.in_complex ) {
     return 11; // TODO
     // return 0;
   }
@@ -161,7 +161,7 @@ int main( int argc, char **argv )
   fftw_execute( plan );
   fftw_destroy_plan( plan );
 
-  out_res( *os, out, o_prm );
+  out_res( *os, out, p_prm );
 
   return 0;
 }
@@ -224,7 +224,7 @@ size_t read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> 
   return n;
 }
 
-void out_res( ostream &os, const Fftw_Data &d, const out_params &p )
+void out_res( ostream &os, const Fftw_Data &d, const pgm_params &p )
 {
   const auto o_n = d.size();
   unsigned st = p.drop_zero ? 1 : 0;
