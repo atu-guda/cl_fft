@@ -199,12 +199,17 @@ size_t read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> 
       }
 
       size_t epos;
-      double v = stod( sv, &epos );
-      if( epos < 1 ) {
+      double v;
+      try {
+        v = stod( sv, &epos );
+      } catch( std::invalid_argument &e ) {
         cerr << "Fail to convert column " << i << " in line " << n_line << " n= " << n << endl;
-        cerr << "Column: \"" << sv << "\" Line: \"" << s << "\"" << endl;
+        cerr << "Column: \"" << sv << "\" Line: \"" << s << "\"" << e.what() << endl;
         return 0;
       }
+      if( epos < 1 ) {
+      }
+
       if( i == t_idx ) {
         c_t = v;
       } else if( i == x_idx ) {
