@@ -58,14 +58,15 @@ Fftw_Data::~Fftw_Data()
 }
 
 struct out_params {
-  double f_max = DBL_MAX;
+  double f_max     = DBL_MAX;
   bool out_complex = false;
-  bool drop_zero = false;
-  bool out_Hz = false;
+  bool in_complex  = false;
+  bool drop_zero   = false;
+  bool out_Hz      = false;
 };
 
 void out_res( ostream &os, const Fftw_Data &d, const out_params &p );
-unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> &d, double &dt );
+size_t read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> &d, double &dt );
 void show_help( const char *pname );
 
 int main( int argc, char **argv )
@@ -80,18 +81,19 @@ int main( int argc, char **argv )
   double dt = 0;
   vector<double> in_x;
 
-  while( (op = getopt( argc, argv, "hdcrt:x:f:o:0z") ) != -1 ) {
+  while( (op = getopt( argc, argv, "hdcCrt:x:f:o:0z") ) != -1 ) {
     switch ( op ) {
-      case 'h': show_help( argv[0] );  return 0;
-      case 'd': debug++;                break;
+      case 'h': show_help( argv[0] );           return 0;
+      case 'd': debug++;                        break;
       case 'c': o_prm.out_complex = true;       break;
-      case 'r': f_dir = FFTW_BACKWARD;  break;
-      case 't': t_idx = atoi( optarg ); break;
-      case 'x': x_idx = atoi( optarg ); break;
-      case 'f': o_prm.f_max = atof( optarg ); break;
-      case 'o': ofile = optarg;         break;
-      case '0': o_prm.drop_zero = true;       break;
-      case 'z': o_prm.out_Hz = true;          break;
+      case 'C': o_prm.in_complex  = true;       break;
+      case 'r': f_dir = FFTW_BACKWARD;          break;
+      case 't': t_idx = atoi( optarg );         break;
+      case 'x': x_idx = atoi( optarg );         break;
+      case 'f': o_prm.f_max = atof( optarg );   break;
+      case 'o': ofile = optarg;                 break;
+      case '0': o_prm.drop_zero = true;         break;
+      case 'z': o_prm.out_Hz = true;            break;
       default: cerr << "Unknown or bad option '" << (char)optopt << endl;
                show_help( argv[0] );
                return 1;
@@ -107,7 +109,7 @@ int main( int argc, char **argv )
 
 
   const char *ifile = argv[optind];
-  if( ifile[0] == '-' || ifile[1] == '\0' ) {
+  if( ifile[0] == '-' && ifile[1] == '\0' ) {
     ifile = "/dev/stdin";
   }
   ifstream ifs( ifile );
@@ -126,7 +128,7 @@ int main( int argc, char **argv )
     os = &ofs;
   }
 
-  unsigned n =  read_infile( ifs, t_idx, x_idx, in_x, dt );
+  auto n =  read_infile( ifs, t_idx, x_idx, in_x, dt );
   if( n < 1 ) {
     cerr << "input data error" << endl;
     return 4;
@@ -135,7 +137,6 @@ int main( int argc, char **argv )
   ifs.close();
   cerr << "# n= " << n << " dt = " << dt << endl;
 
-  // fftw_plan plan;
   if( f_dir == FFTW_BACKWARD ) { // TODO: implement
     cerr << "backword transform is unimplemented for now" << endl;
     return 10;
@@ -144,25 +145,30 @@ int main( int argc, char **argv )
     // fftw_execute( plan );
 
     // out_res( *os, out, o_prm );
-  } else {
-
-    fftw_plan plan;
-    Fftw_Data out( n, dt );
-
-    plan = fftw_plan_dft_r2c_1d( n, &(in_x[0]), out.data(), FFTW_ESTIMATE );
-
-    fftw_execute( plan );
-    fftw_destroy_plan( plan );
-
-    out_res( *os, out, o_prm );
   }
+
+  if( o_prm.in_complex ) {
+    return 11; // TODO
+    // return 0;
+  }
+
+  // real input
+  fftw_plan plan;
+  Fftw_Data out( n, dt );
+
+  plan = fftw_plan_dft_r2c_1d( n, &(in_x[0]), out.data(), FFTW_ESTIMATE );
+
+  fftw_execute( plan );
+  fftw_destroy_plan( plan );
+
+  out_res( *os, out, o_prm );
 
   return 0;
 }
 
-unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> &d, double &dt )
+size_t read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double> &d, double &dt )
 {
-  unsigned n = 0, n_line = 0;
+  size_t n {0}, n_line {0};
   double old_t = 0;
 
   auto idx_max = max( t_idx, x_idx );
@@ -174,18 +180,16 @@ unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double
     getline( is, s );
     s = trim( s );
     ++n_line;
-    if( s.empty() ) {
+    if( s.empty() || s[0] == '#' || s[0] == ';' ) {
       continue;
     }
-    if( s[0] == '#' || s[0] == ';' ) {
-      continue;
-    }
+
     istringstream is( s );
     vals.assign( vals.size(), 0 );
 
     unsigned i; // need after for
     for( i=0; i<= idx_max ; /* NOP */ ) {
-      double v = DBL_MAX;
+      double v = DBL_MAX; // to catch read fail
       is >> v;
       if( v >= DBL_MAX ) {
         cerr << "Read only " << i << " columns in line " << n_line << " n= " << n << endl;
@@ -222,11 +226,13 @@ unsigned read_infile( istream &is, unsigned t_idx, unsigned x_idx, vector<double
 
 void out_res( ostream &os, const Fftw_Data &d, const out_params &p )
 {
-  unsigned o_n = d.size();
+  const auto o_n = d.size();
   unsigned st = p.drop_zero ? 1 : 0;
-  auto n = d.get_N_in();
+  const auto n = d.get_N_in();
+
   double f_coeff = ( p.out_Hz ? 1 : (2 * M_PI) )  /  ( d.get_dt() * n );
-  for( unsigned i=st; i<o_n ; ++i ) {
+
+  for( decltype(+o_n) i=st; i<o_n ; ++i ) {
     double fr = f_coeff * i;
     if( fr > p.f_max ) {
       break;
@@ -245,9 +251,10 @@ void show_help( const char *pname )
           "  -h = help\n"
           "  -d = debug++\n"
           "  -c = complex output\n"
+          "  -C = complex input\n"
           "  -r = reverse transform (unimplemented)\n"
           "  -t idx  = index of 't' column, def = 0\n"
-          "  -x idx  = index of 'x' column, def = 1\n"
+          "  -x idx  = index of 'x' column, def = 1, complex: x+1 \n"
           "  -f val  = maximum required frequency \n"
           "  -o file  = set output file \n"
           "  -0      = drop zero frequency from output \n"
