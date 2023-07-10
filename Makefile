@@ -21,7 +21,7 @@ ALLFLAGS += -march=native
 ALLFLAGS += $(CFLAGS_ADD)
 
 CFLAGS   = $(ALLFLAGS)
-CXXFLAGS = $(ALLFLAGS) -fgnu-keywords -Weffc++ -Woverloaded-virtual # -std=c++17 -std=c++20  -std=c++23 -std=gnu++23 -fconcepts
+CXXFLAGS = $(ALLFLAGS) -std=gnu++23 -fgnu-keywords -Weffc++ -Woverloaded-virtual # -std=c++17 -std=c++20  -std=c++23 -std=gnu++23 -fconcepts
 
 EXTLIBS += -lm -lfftw3
 
