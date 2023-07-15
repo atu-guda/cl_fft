@@ -41,11 +41,11 @@ class Fftw_Data {
    double& operator[]( unsigned i, unsigned j )       { return d[i][j]; };
    fftw_complex* data() { return d; };
    const fftw_complex* cdata() { return d; };
-   unsigned size() const { return sz; }
-   unsigned get_N_in() const { return n_in; }
+   size_t size() const { return sz; }
+   size_t get_N_in() const { return n_in; }
 
   protected:
-   unsigned n_in, sz;
+   size_t n_in, sz;
    fftw_complex *d;
 };
 
@@ -235,7 +235,7 @@ size_t read_infile( istream &is, pgm_params &prm, vector<double> &d_x, vector<do
         return 0;
       }
 
-      if( i != prm.t_idx  &&  i != prm.re_idx &&  i != prm.im_idx  ) { // skip unused, TODO: complex
+      if( i != prm.t_idx  &&  i != prm.re_idx &&  i != prm.im_idx  ) { // skip unused
         continue;
       }
 
@@ -300,13 +300,13 @@ size_t read_infile( istream &is, pgm_params &prm, vector<double> &d_x, vector<do
 void out_res( ostream &os, const Fftw_Data &d, const pgm_params &p )
 {
   const auto o_n = d.size();
-  unsigned st = p.drop_zero ? 1 : 0;
+  const unsigned st = p.drop_zero ? 1 : 0;
   const auto n = d.get_N_in();
 
-  double f_coeff = ( p.out_Hz ? 1 : (2 * M_PI) )  /  ( p.dt * n );
+  const double f_coeff = ( p.out_Hz ? 1 : (2 * M_PI) )  /  ( p.dt * n );
 
   for( decltype(+o_n) i=st; i<o_n ; ++i ) {
-    double fr = f_coeff * i;
+    const double fr = f_coeff * i;
     if( fr > p.f_max ) {
       break;
     }

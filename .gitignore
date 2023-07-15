@@ -1,4 +1,5 @@
 cl_fft
+test_data/mk_test_data
 
 # test data
 *.txt
