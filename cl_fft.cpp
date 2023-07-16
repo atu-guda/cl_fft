@@ -5,7 +5,6 @@
 #include <sstream>
 #include <fstream>
 #include <climits>
-// #include <complex>
 #include <vector>
 #include <algorithm>
 #include <cerrno>
@@ -16,8 +15,6 @@
 #include <fftw3.h>
 
 using namespace std;
-
-// using Compl = complex<double>;
 
 int debug = 0;
 
@@ -178,11 +175,8 @@ int main( int argc, char **argv )
       return 7;
     }
     Fftw_Data in_d( in_x, in_y );
-    cerr << "# TODO:" << endl;
     fftw_plan plan = fftw_plan_dft_1d( n, in_d.data(), out.data(), FFTW_FORWARD, FFTW_ESTIMATE );
-    cerr << "# plan:" << endl;
     fftw_execute( plan );
-    cerr << "# exec:" << endl;
     fftw_destroy_plan( plan );
     out_res( *os, out, p_prm );
     return 0;
@@ -299,28 +293,31 @@ size_t read_infile( istream &is, pgm_params &prm, vector<double> &d_x, vector<do
 
 void out_res( ostream &os, const Fftw_Data &d, const pgm_params &p )
 {
-  const auto o_n = d.size();
+  const auto o_n = d.size()     / ( p.in_complex ? 2 : 1 ) + ( p.in_complex ? 1 : 0 );
+  const auto n   = d.get_N_in() / ( p.in_complex ? 2 : 1 );
+  const double f_max = ( p.out_Hz ? 0.5 : M_PI ) / p.dt;
   const unsigned st = p.drop_zero ? 1 : 0;
-  const auto n = d.get_N_in();
-  const double f_max = ( p.in_complex ? 2 : 1 )
-                       * ( p.out_Hz ? 1 : (2 * M_PI) )  /  ( p.dt );
 
   os << "# in_compl: " << p.in_complex << " out_complex= " << p.out_complex
      << " out_Hz= " << p.out_Hz << endl;
   os << "# n= " << n << " o_n= " << o_n << " d_t= " << p.dt << " f_max= " << f_max << endl;
 
-  const double f_coeff = f_max / n;
+  const double f_coeff = 2 * f_max / n;
+  double mult = 2.0 / n;
 
   for( decltype(+o_n) i=st; i<o_n ; ++i ) {
     const double fr = f_coeff * i;
     if( fr > p.f_max ) {
       break;
     }
+    if( i >= (o_n-1) ) {
+      mult = 1.0 / n;
+    }
     os << setw( p.o_w) << fr << ' ';
     if( p.out_complex ) {
-       os << setw( p.o_w ) << (2.0*d[i,0]/n) << ' ' << setw( p.o_w ) << (2.0*d[i,1]/n) << endl;
+       os << setw( p.o_w ) << (mult*d[i,0]) << ' ' << setw( p.o_w ) << (mult*d[i,1]) << endl;
     } else {
-       os << setw( p.o_w ) << ( 2.0 * hypot( d[i,0], d[i,1] ) / n ) << endl;
+       os << setw( p.o_w ) << ( mult * hypot( d[i,0], d[i,1] ) ) << endl;
     }
   }
 }
