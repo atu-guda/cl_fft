@@ -1,0 +1,4 @@
+Simple program to conduct forward (for now) FFT transform using fftw library.
+
+Input and output may me both in real and complex form.
+
