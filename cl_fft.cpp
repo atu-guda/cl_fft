@@ -302,8 +302,14 @@ void out_res( ostream &os, const Fftw_Data &d, const pgm_params &p )
   const auto o_n = d.size();
   const unsigned st = p.drop_zero ? 1 : 0;
   const auto n = d.get_N_in();
+  const double f_max = ( p.in_complex ? 2 : 1 )
+                       * ( p.out_Hz ? 1 : (2 * M_PI) )  /  ( p.dt );
 
-  const double f_coeff = ( p.out_Hz ? 1 : (2 * M_PI) )  /  ( p.dt * n );
+  os << "# in_compl: " << p.in_complex << " out_complex= " << p.out_complex
+     << " out_Hz= " << p.out_Hz << endl;
+  os << "# n= " << n << " o_n= " << o_n << " d_t= " << p.dt << " f_max= " << f_max << endl;
+
+  const double f_coeff = f_max / n;
 
   for( decltype(+o_n) i=st; i<o_n ; ++i ) {
     const double fr = f_coeff * i;
@@ -312,9 +318,9 @@ void out_res( ostream &os, const Fftw_Data &d, const pgm_params &p )
     }
     os << setw( p.o_w) << fr << ' ';
     if( p.out_complex ) {
-       os << setw( p.o_w ) << d[i,0] << ' ' << setw( p.o_w) << d[i,1] << endl;
+       os << setw( p.o_w ) << (2.0*d[i,0]/n) << ' ' << setw( p.o_w ) << (2.0*d[i,1]/n) << endl;
     } else {
-       os << setw( p.o_w ) << ( 2.0 * hypot( d[i,0], d[i,1] ) / ( double(n) ) ) << endl;
+       os << setw( p.o_w ) << ( 2.0 * hypot( d[i,0], d[i,1] ) / n ) << endl;
     }
   }
 }
